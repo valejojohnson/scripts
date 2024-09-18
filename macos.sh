@@ -1,5 +1,22 @@
 #!/bin/bash
 
+# Function to print an error and exit the script
+error_exit() {
+  echo "Error: $1"
+  exit 1
+}
+
+# Function to check if Homebrew is installed
+check_brew() {
+  echo "Checking for Homebrew..."
+  if ! command -v brew &> /dev/null; then
+    echo "Homebrew is not installed. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || error_exit "Failed to install Homebrew."
+  else
+    echo "Homebrew is already installed."
+  fi
+}
+
 # Function to check if an application is installed via `mdfind`
 is_app_installed() {
   mdfind "kMDItemCFBundleIdentifier == '$1'" | grep -q .
@@ -16,64 +33,46 @@ install_brew_package() {
     echo "$1 is already installed."
   else
     echo "$1 is not installed. Installing $1..."
-    brew install "$1"
+    brew install "$1" || error_exit "Failed to install $1."
   fi
 }
 
-# Check if iTerm2 is installed
-echo "Checking for iTerm2..."
-if is_app_installed "com.googlecode.iterm2"; then
-  echo "iTerm2 is already installed."
-else
-  echo "iTerm2 is not installed. Installing iTerm2..."
-  brew install --cask iterm2
-fi
+# Function to check and install a Homebrew cask package (for applications)
+install_cask_app() {
+  local app_name=$1
+  local bundle_id=$2
+  echo "Checking for $app_name..."
+  if is_app_installed "$bundle_id"; then
+    echo "$app_name is already installed."
+  else
+    echo "$app_name is not installed. Installing $app_name..."
+    brew install --cask "$app_name" --no-quarantine || error_exit "Failed to install $app_name."
+  fi
+}
 
-# Check if zsh is installed
-echo "Checking for Zsh..."
-if [ "$SHELL" = "/bin/zsh" ] || [ "$SHELL" = "/usr/bin/zsh" ]; then
-  echo "Zsh is already the default shell."
-else
-  echo "Zsh is not installed or not the default shell. Installing Zsh..."
-  brew install zsh
-  chsh -s /bin/zsh
-fi
+# Function to check if Zsh is installed and set as the default shell
+check_zsh() {
+  echo "Checking for Zsh..."
+  if [[ "$SHELL" == */zsh ]]; then
+    echo "Zsh is already the default shell."
+  else
+    echo "Zsh is not installed or not the default shell. Installing Zsh..."
+    brew install zsh || error_exit "Failed to install Zsh."
+    chsh -s "$(which zsh)" || error_exit "Failed to change the default shell to Zsh."
+  fi
+}
 
-# Check if Homebrew is installed
-echo "Checking for Homebrew..."
-if ! command -v brew &> /dev/null; then
-  echo "Homebrew is not installed. Installing Homebrew..."
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-else
-  echo "Homebrew is already installed."
-fi
+# Check for Homebrew
+check_brew
 
-# Check if IntelliJ IDEA Ultimate (Apple Silicon version) is installed
-echo "Checking for IntelliJ IDEA Ultimate (Apple Silicon)..."
-if is_app_installed "com.jetbrains.intellij.ce"; then
-  echo "IntelliJ IDEA Ultimate is already installed."
-else
-  echo "IntelliJ IDEA Ultimate is not installed. Installing IntelliJ IDEA Ultimate for Apple Silicon..."
-  brew install --cask intellij-idea --no-quarantine
-fi
+# Install applications using Homebrew casks
+install_cask_app "iterm2" "com.googlecode.iterm2"
+install_cask_app "intellij-idea" "com.jetbrains.intellij"
+install_cask_app "docker" "com.docker.docker"
+install_cask_app "firefox" "org.mozilla.firefox"
 
-# Check if Docker Desktop is installed
-echo "Checking for Docker Desktop..."
-if is_app_installed "com.docker.docker"; then
-  echo "Docker Desktop is already installed."
-else
-  echo "Docker Desktop is not installed. Installing Docker Desktop..."
-  brew install --cask docker
-fi
-
-# Check if Firefox is installed
-echo "Checking for Firefox..."
-if is_app_installed "org.mozilla.firefox"; then
-  echo "Firefox is already installed."
-else
-  echo "Firefox is not installed. Installing Firefox..."
-  brew install --cask firefox
-fi
+# Check and install Zsh if necessary
+check_zsh
 
 # Homebrew packages to install
 PACKAGES=(
