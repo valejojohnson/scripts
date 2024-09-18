@@ -49,24 +49,22 @@ chmod +x copy.sh inet.sh macos.sh
 
 Then, just run the script of your choice and let the magic happen. ✨
 
-🧑‍💻 Who’s This For?
+## 🧑‍💻 Who’s This For? 
+- macOS users who want to save time and impress their friends. 
+- Developers who hate setting up new environments but love using the latest tools. 
+- People who forget what their public IP is (we’ve all been there).
 
-	•	macOS users who want to save time and impress their friends.
-	•	Developers who hate setting up new environments but love using the latest tools.
-	•	People who forget what their public IP is (we’ve all been there).
+## ⚠️ Requirements 
+- macOS (because Windows can’t sit with us). 
+- An internet connection (because installing things from the web without internet is… tricky). 
+- Admin rights for the heavy-duty stuff in macos.sh. 🔐
 
-⚠️ Requirements
+## 🌟 Pro Tips 
+- Modify the macOS script to add or remove the packages you need. Maybe you don’t need all of them, but come on, who doesn’t need more tools in their toolbox? 
+- Run inet.sh when you’re bored and want to feel like a spy tracking down IP addresses.
 
-	•	macOS (because Windows can’t sit with us).
-	•	An internet connection (because installing things from the web without internet is… tricky).
-	•	Admin rights for the heavy-duty stuff in macos.sh. 🔐
 
-🌟 Pro Tips
-
-	•	Modify the macOS script to add or remove the packages you need. Maybe you don’t need all of them, but come on, who doesn’t need more tools in their toolbox?
-	•	Run inet.sh when you’re bored and want to feel like a spy tracking down IP addresses.
-
-💬 Final Words
+## 💬 Final Words
 
 Automation is your friend. Scripts are like those little magic wands that make your life easier. These scripts won’t do your laundry, but they’ll save you time on your computer so you can finally figure out how to fold a fitted sheet. 😜
 
