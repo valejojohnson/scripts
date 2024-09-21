@@ -12,6 +12,8 @@ check_brew() {
   if ! command -v brew &> /dev/null; then
     echo "Homebrew is not installed. Installing Homebrew..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || error_exit "Failed to install Homebrew."
+    (echo; echo 'eval "$(/opt/homebrew/bin/brew shellenv)"') >> /Users/valejojohnson/.zprofile
+    eval "$(/opt/homebrew/bin/brew shellenv)"
   else
     echo "Homebrew is already installed."
   fi
@@ -62,6 +64,19 @@ check_zsh() {
   fi
 }
 
+# Function to install ChatGPT desktop app
+install_chatgpt_app() {
+  local app_name="chatgpt"
+  local bundle_id="com.openai.chatgpt" # Replace with the actual bundle identifier if different
+  echo "Checking for ChatGPT app..."
+  if is_app_installed "$bundle_id"; then
+    echo "ChatGPT app is already installed."
+  else
+    echo "ChatGPT app is not installed. Installing ChatGPT app..."
+    brew install --cask "$app_name" --no-quarantine || error_exit "Failed to install ChatGPT app."
+  fi
+}
+
 # Check for Homebrew
 check_brew
 
@@ -70,6 +85,7 @@ install_cask_app "iterm2" "com.googlecode.iterm2"
 install_cask_app "intellij-idea" "com.jetbrains.intellij"
 install_cask_app "docker" "com.docker.docker"
 install_cask_app "firefox" "org.mozilla.firefox"
+install_chatgpt_app
 
 # Check and install Zsh if necessary
 check_zsh
