@@ -7,83 +7,109 @@ is_command_installed() {
     command -v "$1" &>/dev/null
 }
 
-# Function to check if an application is installed via `mdfind`
-is_app_installed() {
-    mdfind "kMDItemCFBundleIdentifier == '$1'" | grep -q . 2>/dev/null
+# Install Homebrew if not already installed
+install_homebrew() {
+    if ! is_command_installed brew; then
+        echo "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    fi
 }
 
-# Function to check if a Homebrew package is installed
-is_brew_package_installed() {
-    brew list --formula 2>/dev/null | grep -q "^$1$"
+# Install a Homebrew formula
+install_formula() {
+    if ! brew list --formula | grep -q "^$1$"; then
+        echo "Installing formula: $1"
+        brew install "$1"
+    else
+        echo "Formula already installed: $1"
+    fi
 }
 
-# Generic installation function for Homebrew formulae and casks
-install_brew() {
-    local type=$1
-    local name=$2
-    local identifier=${3:-}
-    shift 3
-    case $type in
-        formula)
-            if ! is_brew_package_installed "$name"; then
-                echo "Installing $name..."
-                brew install "$name" &
-            fi
-            ;;
-        cask)
-            if ! is_app_installed "$identifier"; then
-                echo "Installing $name..."
-                brew install --cask "$name" "$@" &
-            fi
-            ;;
-        *)
-            echo "Unknown type: $type" >&2
-            exit 1
-            ;;
-    esac
+# Install a Homebrew cask
+install_cask() {
+    local app="$1"
+    local identifier="$2"
+    if ! mdfind "kMDItemCFBundleIdentifier == '$identifier'" | grep -q .; then
+        echo "Installing cask: $app"
+        brew install --cask "$app" --no-quarantine
+    else
+        echo "Cask already installed: $app"
+    fi
 }
 
-# Install Homebrew if not installed
-if ! is_command_installed brew; then
-    echo "Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-fi
+# Install Oh My Zsh and plugins
+install_oh_my_zsh_and_plugins() {
+    if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+        echo "Installing Oh My Zsh..."
+        RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    else
+        echo "Oh My Zsh already installed."
+    fi
 
-# Install cask applications
-declare -A CASKS=(
-    [iterm2]="com.googlecode.iterm2"
-    [intellij-idea]="com.jetbrains.intellij"
-    [docker]="com.docker.docker"
-    [firefox]="org.mozilla.firefox"
-)
+    ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
-echo "Installing cask applications..."
-for cask in "${!CASKS[@]}"; do
-    install_brew cask "$cask" "${CASKS[$cask]}" --no-quarantine
-done
+    # Install plugins
+    echo "Installing Zsh plugins..."
 
-# Ensure Zsh is installed and set as default shell
-if [[ "$SHELL" != *"zsh"* ]]; then
-    echo "Installing Zsh..."
-    install_brew formula zsh
+    [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]] && \
+        git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+
+    [[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]] && \
+        git clone https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+
+    [[ ! -d "$ZSH_CUSTOM/plugins/fast-syntax-highlighting" ]] && \
+        git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git "$ZSH_CUSTOM/plugins/fast-syntax-highlighting"
+
+    [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autocomplete" ]] && \
+        git clone --depth 1 https://github.com/marlonrichert/zsh-autocomplete "$ZSH_CUSTOM/plugins/zsh-autocomplete"
+
+    # Enable plugins in .zshrc
+    echo "Enabling Zsh plugins in ~/.zshrc..."
+
+    if grep -q "^plugins=" "$HOME/.zshrc"; then
+        sed -i '' 's/^plugins=(.*)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)/' "$HOME/.zshrc"
+    else
+        echo "plugins=(git zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)" >> "$HOME/.zshrc"
+    fi
+}
+
+### --- START INSTALL PROCESS ---
+
+install_homebrew
+
+# Install casks
+echo "Installing cask apps..."
+install_cask iterm2 com.googlecode.iterm2
+install_cask intellij-idea com.jetbrains.intellij
+install_cask firefox org.mozilla.firefox
+
+# Install Zsh and set it as default shell if needed
+if [[ "$SHELL" != *zsh* ]]; then
+    install_formula zsh
     sudo chsh -s /bin/zsh
 fi
 
-# Homebrew formulae to install
-PACKAGES=(
-    aom ca-certificates flac glib highway kubernetes-cli libbluray libnghttp2 libsodium libusb libxau lzo opencore-amr pcre2 python@3.11 sops tesseract xvid
-    aribb24 cairo fontconfig gmp icu4c lame libevent libogg libsoxr libuv libxcb mbedtls openexr pinentry python@3.12 speex theora xz
-    aws-cdk cffi freetype gnupg imath leptonica libgcrypt libpng libssh libvidstab libxdmcp mpdecimal openjpeg pipx pixman readline srt sqlite unbound yarn
-    awscli cjson frei0r gnutls jpeg-turbo libarchive libgpg-error libpq libtasn1 libvmaf libxext mpg123 openssl@3 p11-kit psql2csv rubberband svt-av1 x264 zimg
-    azure-cli cryptography fribidi graphite2 jpeg-xl libass libidn2 librist libtiff libvorbis libxrender nettle opus postgresql@15 rav1e snappy terraform x265 zstd
-    brotli dav1d gettext harfbuzz krb5 libassuan libksba libsamplerate libunibreak libvpx little-cms2 node pango pycparser snappy terragrunt xorgproto
+# Install Oh My Zsh and Zsh plugins
+install_oh_my_zsh_and_plugins
+
+# Install Homebrew formulas
+echo "Installing formulas..."
+FORMULAS=(
+    aom aribb24 aws-cdk awscli azure-cli brotli ca-certificates cairo cffi cjson cryptography
+    dav1d flac fontconfig freetype frei0r fribidi gmp gnupg gnutls graphite2 harfbuzz highway icu4c
+    imath jpeg-turbo jpeg-xl krb5 lame leptonica libarchive libass libassuan libbluray libevent
+    libgcrypt libgpg-error libidn2 libksba libnghttp2 libogg libpq librist libsamplerate libsoxr
+    libsodium libssh libtasn1 libtiff libunibreak libusb libuv libvidstab libvmaf libvorbis libvpx
+    libxau libxcb libxdmcp libxext libxrender little-cms2 lzo mbedtls mpdecimal mpg123 nettle node
+    opencore-amr openexr openjpeg openssl@3 opus p11-kit pango pcre2 pinentry pipx pixman postgresql@15
+    psql2csv pycparser python@3.11 python@3.12 rav1e readline rubberband snappy sops speex sqlite
+    srt svt-av1 terraform terragrunt tesseract theora unbound x264 x265 xvid xz yarn zimg zstd xorgproto
 )
 
-echo "Installing Homebrew formulae..."
-for package in "${PACKAGES[@]}"; do
-    install_brew formula "$package"
+for pkg in "${FORMULAS[@]}"; do
+    install_formula "$pkg"
 done
 
-wait
-
-echo "Setup complete!"
+echo "✅ macOS setup complete!"
+echo "💡 Restart your terminal or run 'exec zsh' to load new Zsh environment."
