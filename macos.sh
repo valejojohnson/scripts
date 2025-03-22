@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+# Warn user if not running in iTerm2
+if [[ "$TERM_PROGRAM" != "iTerm.app" ]]; then
+  echo "⚠️  Please run this script from iTerm2 for best results."
+fi
+
 # Function to check if a command exists
 is_command_installed() {
     command -v "$1" &>/dev/null
@@ -49,7 +54,6 @@ install_oh_my_zsh_and_plugins() {
 
     ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
-    # Install plugins
     echo "Installing Zsh plugins..."
 
     [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]] && \
@@ -64,9 +68,7 @@ install_oh_my_zsh_and_plugins() {
     [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autocomplete" ]] && \
         git clone --depth 1 https://github.com/marlonrichert/zsh-autocomplete "$ZSH_CUSTOM/plugins/zsh-autocomplete"
 
-    # Enable plugins in .zshrc
     echo "Enabling Zsh plugins in ~/.zshrc..."
-
     if grep -q "^plugins=" "$HOME/.zshrc"; then
         sed -i '' 's/^plugins=(.*)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)/' "$HOME/.zshrc"
     else
@@ -74,26 +76,82 @@ install_oh_my_zsh_and_plugins() {
     fi
 }
 
+# Install Final Cut Pro from Mac App Store
+install_final_cut_pro() {
+    if ! mas list | grep -q "424389933"; then
+        echo "Installing Final Cut Pro from Mac App Store..."
+        mas install 424389933
+    else
+        echo "Final Cut Pro is already installed."
+    fi
+}
+
+# Ensure user is signed into Mac App Store
+ensure_mas_signed_in() {
+    if ! mas account &>/dev/null; then
+        echo "⚠️  You are not signed in to the Mac App Store."
+        echo "Prompting sign-in..."
+        mas signin --dialog || {
+            echo "❌ Failed to sign in. Please sign in manually via App Store and rerun the script."
+            exit 1
+        }
+    else
+        echo "✅ Mac App Store account detected: $(mas account)"
+    fi
+}
+
+# Install ChatGPT Mac App
+install_chatgpt_mac_app() {
+    local dmg_url="https://chat.openai.com/apps/mac/chatgpt.dmg"
+    local dmg_path="/tmp/chatgpt.dmg"
+    local mount_point="/Volumes/ChatGPT"
+    local app_path="$mount_point/ChatGPT.app"
+    local destination="/Applications/ChatGPT.app"
+
+    if [ -d "$destination" ]; then
+        echo "ChatGPT Mac app already installed."
+        return
+    fi
+
+    echo "Downloading ChatGPT Mac app..."
+    curl -L "$dmg_url" -o "$dmg_path"
+
+    echo "Mounting DMG..."
+    hdiutil attach "$dmg_path" -mountpoint "$mount_point" -quiet
+
+    if [ -d "$app_path" ]; then
+        echo "Copying ChatGPT.app to /Applications..."
+        cp -R "$app_path" /Applications/
+    else
+        echo "❌ Failed to find ChatGPT.app in mounted image."
+    fi
+
+    echo "Unmounting DMG..."
+    hdiutil detach "$mount_point" -quiet
+
+    echo "Cleaning up..."
+    rm -f "$dmg_path"
+
+    echo "✅ ChatGPT Mac app installation complete."
+}
+
 ### --- START INSTALL PROCESS ---
 
 install_homebrew
 
-# Install casks
 echo "Installing cask apps..."
 install_cask iterm2 com.googlecode.iterm2
 install_cask intellij-idea com.jetbrains.intellij
 install_cask firefox org.mozilla.firefox
+install_cask 1password com.1password.1password
 
-# Install Zsh and set it as default shell if needed
 if [[ "$SHELL" != *zsh* ]]; then
     install_formula zsh
     sudo chsh -s /bin/zsh
 fi
 
-# Install Oh My Zsh and Zsh plugins
 install_oh_my_zsh_and_plugins
 
-# Install Homebrew formulas
 echo "Installing formulas..."
 FORMULAS=(
     aom aribb24 aws-cdk awscli azure-cli brotli ca-certificates cairo cffi cjson cryptography
@@ -105,11 +163,16 @@ FORMULAS=(
     opencore-amr openexr openjpeg openssl@3 opus p11-kit pango pcre2 pinentry pipx pixman postgresql@15
     psql2csv pycparser python@3.11 python@3.12 rav1e readline rubberband snappy sops speex sqlite
     srt svt-av1 terraform terragrunt tesseract theora unbound x264 x265 xvid xz yarn zimg zstd xorgproto
+    mas
 )
 
 for pkg in "${FORMULAS[@]}"; do
     install_formula "$pkg"
 done
 
+ensure_mas_signed_in
+install_final_cut_pro
+install_chatgpt_mac_app
+
 echo "✅ macOS setup complete!"
-echo "💡 Restart your terminal or run 'exec zsh' to load new Zsh environment."
+echo "💡 Restart your terminal or run 'exec zsh' to load the new Zsh environment."
