@@ -156,7 +156,7 @@ echo "Installing formulas..."
 FORMULAS=(
     aom aribb24 aws-cdk awscli azure-cli brotli ca-certificates cairo cffi cjson cryptography
     dav1d flac fontconfig freetype frei0r fribidi gmp gnupg gnutls graphite2 harfbuzz highway icu4c
-    imath jpeg-turbo jpeg-xl krb5 lame leptonica libarchive libass libassuan libbluray libevent
+    imath jpeg-turbo jpeg-xl krb5  kubectl lame leptonica libarchive libass libassuan libbluray libevent
     libgcrypt libgpg-error libidn2 libksba libnghttp2 libogg libpq librist libsamplerate libsoxr
     libsodium libssh libtasn1 libtiff libunibreak libusb libuv libvidstab libvmaf libvorbis libvpx
     libxau libxcb libxdmcp libxext libxrender little-cms2 lzo mbedtls mpdecimal mpg123 nettle node
