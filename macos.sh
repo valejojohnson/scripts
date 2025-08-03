@@ -100,63 +100,32 @@ ensure_mas_signed_in() {
     fi
 }
 
-# Install ChatGPT Mac App
-install_chatgpt_mac_app() {
-    local dmg_url="https://chat.openai.com/apps/mac/chatgpt.dmg"
-    local dmg_path="/tmp/chatgpt.dmg"
-    local mount_point="/Volumes/ChatGPT"
-    local app_path="$mount_point/ChatGPT.app"
-    local destination="/Applications/ChatGPT.app"
-
-    if [ -d "$destination" ]; then
-        echo "ChatGPT Mac app already installed."
-        return
-    fi
-
-    echo "Downloading ChatGPT Mac app..."
-    curl -L "$dmg_url" -o "$dmg_path"
-
-    echo "Mounting DMG..."
-    hdiutil attach "$dmg_path" -mountpoint "$mount_point" -quiet
-
-    if [ -d "$app_path" ]; then
-        echo "Copying ChatGPT.app to /Applications..."
-        cp -R "$app_path" /Applications/
-    else
-        echo "❌ Failed to find ChatGPT.app in mounted image."
-    fi
-
-    echo "Unmounting DMG..."
-    hdiutil detach "$mount_point" -quiet
-
-    echo "Cleaning up..."
-    rm -f "$dmg_path"
-
-    echo "✅ ChatGPT Mac app installation complete."
-}
-
 ### --- START INSTALL PROCESS ---
 
 install_homebrew
 
+# Install essential casks
 echo "Installing cask apps..."
 install_cask iterm2 com.googlecode.iterm2
 install_cask intellij-idea com.jetbrains.intellij
 install_cask firefox org.mozilla.firefox
 install_cask 1password com.1password.1password
 
+# Install Zsh and set it as default shell if not already
 if [[ "$SHELL" != *zsh* ]]; then
     install_formula zsh
     sudo chsh -s /bin/zsh
 fi
 
+# Install Oh My Zsh and Zsh plugins
 install_oh_my_zsh_and_plugins
 
+# Install Homebrew formulas
 echo "Installing formulas..."
 FORMULAS=(
     aom aribb24 aws-cdk awscli azure-cli brotli ca-certificates cairo cffi cjson cryptography
     dav1d flac fontconfig freetype frei0r fribidi gmp gnupg gnutls graphite2 harfbuzz highway icu4c
-    imath jpeg-turbo jpeg-xl krb5  kubectl lame leptonica libarchive libass libassuan libbluray libevent
+    imath jpeg-turbo jpeg-xl krb5 lame leptonica libarchive libass libassuan libbluray libevent
     libgcrypt libgpg-error libidn2 libksba libnghttp2 libogg libpq librist libsamplerate libsoxr
     libsodium libssh libtasn1 libtiff libunibreak libusb libuv libvidstab libvmaf libvorbis libvpx
     libxau libxcb libxdmcp libxext libxrender little-cms2 lzo mbedtls mpdecimal mpg123 nettle node
@@ -170,9 +139,9 @@ for pkg in "${FORMULAS[@]}"; do
     install_formula "$pkg"
 done
 
+# Ensure user is signed into Mac App Store before installing Final Cut Pro
 ensure_mas_signed_in
 install_final_cut_pro
-install_chatgpt_mac_app
 
 echo "✅ macOS setup complete!"
 echo "💡 Restart your terminal or run 'exec zsh' to load the new Zsh environment."
