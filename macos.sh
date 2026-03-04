@@ -49,6 +49,7 @@ run_step() {
 
 run_bg() {
   # usage: run_bg "Description" command args...
+  # NOTE: Runs in a subshell, so failures won't appear in the final summary.
   if [ "$#" -lt 2 ]; then
     log_error "run_bg called without enough arguments" 1
     return 0
@@ -127,12 +128,16 @@ install_homebrew() {
 # Map cask names to their .app bundle names for existence checking
 get_app_name_for_cask() {
   case "$1" in
-    iterm2)               echo "iTerm.app" ;;
-    docker)               echo "Docker.app" ;;
-    google-chrome)        echo "Google Chrome.app" ;;
-    1password)            echo "1Password.app" ;;
-    intellij-idea)        echo "IntelliJ IDEA.app" ;;
-    *)                    echo "" ;;  # Unknown, will attempt install
+    iterm2)        echo "iTerm.app" ;;
+    google-chrome) echo "Google Chrome.app" ;;
+    firefox)       echo "Firefox.app" ;;
+    1password)     echo "1Password.app" ;;
+    intellij-idea) echo "IntelliJ IDEA.app" ;;
+    chatgpt)       echo "ChatGPT.app" ;;
+    claude)        echo "Claude.app" ;;
+    zoom)          echo "zoom.us.app" ;;
+    displaylink)   echo "DisplayLink Manager.app" ;;
+    *)             echo "" ;;  # Unknown, will attempt install
   esac
 }
 
@@ -169,23 +174,12 @@ brew_install_or_upgrade() { # formula or cask
 }
 
 run_step "Install/Update Homebrew" install_homebrew
-add_font_tap() {
-  if brew tap | grep -q "^homebrew/cask-fonts$"; then
-    info "homebrew/cask-fonts already tapped"
-  else
-    brew tap homebrew/cask-fonts || true
-  fi
-}
-run_step "Add Homebrew font tap" add_font_tap
 
 # --------------------------- MAS helper -----------------------------
 mas_install_or_upgrade() { # mas_install_or_upgrade <app_id> [name]
   local id="$1" name="${2:-$1}"
   if ! command -v mas >/dev/null 2>&1; then
-    brew_install_or_upgrade mas || return 0
-  fi
-  if ! mas account >/dev/null 2>&1; then
-    warn "Not signed into App Store; skipping MAS app: $name"
+    warn "mas not found; skipping MAS app: $name"
     return 0
   fi
   if mas list | awk '{print $1}' | grep -qx "$id"; then
@@ -219,6 +213,7 @@ install_zsh_plugins() {
   git_clone_or_update https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
   git_clone_or_update https://github.com/zsh-users/zsh-syntax-highlighting "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
   git_clone_or_update https://github.com/zdharma-continuum/fast-syntax-highlighting "$ZSH_CUSTOM/plugins/fast-syntax-highlighting"
+  git_clone_or_update https://github.com/marlonrichert/zsh-autocomplete "$ZSH_CUSTOM/plugins/zsh-autocomplete"
 }
 
 configure_zshrc() {
@@ -227,11 +222,29 @@ configure_zshrc() {
     warn ".zshrc not found; skipping plugin configuration"
     return 0
   fi
-  # Add plugins if not already configured
-  if grep -q "^plugins=(" "$zshrc" && ! grep -q "zsh-autosuggestions" "$zshrc"; then
-    # Replace the plugins line to include our plugins
-    sed -i.bak 's/^plugins=(\(.*\))/plugins=(\1 zsh-autosuggestions zsh-syntax-highlighting)/' "$zshrc" || true
-    info "Updated .zshrc with zsh plugins"
+
+  # Ensure the plugins line has all desired plugins
+  local desired="plugins=(git zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)"
+  if grep -q "^plugins=(" "$zshrc"; then
+    local current
+    current="$(grep "^plugins=(" "$zshrc")"
+    if [ "$current" != "$desired" ]; then
+      sed -i.bak "s/^plugins=(.*)/$desired/" "$zshrc" || true
+      info "Updated .zshrc plugins line"
+    fi
+  else
+    echo "$desired" >> "$zshrc"
+    info "Added plugins line to .zshrc"
+  fi
+
+  # Ensure common aliases and PATH exports
+  if ! grep -q "alias k=kubectl" "$zshrc"; then
+    echo 'alias k=kubectl' >> "$zshrc"
+    info "Added kubectl alias to .zshrc"
+  fi
+  if ! grep -q 'HOME/.local/bin' "$zshrc"; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$zshrc"
+    info "Added .local/bin to PATH in .zshrc"
   fi
 }
 
@@ -313,6 +326,22 @@ setup_ssh_key() {
         info "Public key copied to clipboard - add it to GitHub/GitLab"
       fi
     fi
+    # Create SSH config alongside new key
+    local ssh_config="$ssh_dir/config"
+    if [ ! -f "$ssh_config" ]; then
+      cat > "$ssh_config" <<'SSHEOF'
+Host github.com
+  AddKeysToAgent yes
+  UseKeychain yes
+  IdentityFile ~/.ssh/id_ed25519
+
+Host *
+  AddKeysToAgent yes
+  UseKeychain yes
+SSHEOF
+      chmod 600 "$ssh_config"
+      info "Created SSH config at $ssh_config"
+    fi
   else
     info "SSH key already exists at $ssh_key"
   fi
@@ -351,8 +380,8 @@ configure_macos_defaults() {
   if set_default_if_different com.apple.finder ShowStatusBar -bool true; then
     needs_finder_restart=true
   fi
-  # Finder: default to list view
-  if set_default_if_different com.apple.finder FXPreferredViewStyle -string Nlsv; then
+  # Finder: default to icon view
+  if set_default_if_different com.apple.finder FXPreferredViewStyle -string icnv; then
     needs_finder_restart=true
   fi
 
@@ -364,6 +393,28 @@ configure_macos_defaults() {
   if set_default_if_different com.apple.dock autohide-delay -float 0; then
     needs_dock_restart=true
   fi
+  # Dock: smaller tile size
+  if set_default_if_different com.apple.dock tilesize -int 35; then
+    needs_dock_restart=true
+  fi
+  # Dock: enable magnification
+  if set_default_if_different com.apple.dock magnification -bool true; then
+    needs_dock_restart=true
+  fi
+  # Dock: hide recent apps
+  if set_default_if_different com.apple.dock show-recents -bool false; then
+    needs_dock_restart=true
+  fi
+
+  # Hot corners: top-right = screen saver, bottom-right = disabled
+  if set_default_if_different com.apple.dock wvous-tr-corner -int 5; then
+    needs_dock_restart=true
+  fi
+  set_default_if_different com.apple.dock wvous-tr-modifier -int 0 || true
+  if set_default_if_different com.apple.dock wvous-br-corner -int 1; then
+    needs_dock_restart=true
+  fi
+  set_default_if_different com.apple.dock wvous-br-modifier -int 0 || true
 
   # Screenshots: save to Desktop
   set_default_if_different com.apple.screencapture location -string "$HOME/Desktop" || true
@@ -384,15 +435,20 @@ configure_macos_defaults() {
 
 # ---------------------------- Install sets --------------------------
 FORMULAS=(
-  git gh wget curl jq yq tree coreutils findutils gnu-sed unzip
-  python node pnpm yarn go rust terraform terragrunt awscli sops
+  git gh wget curl jq tree
+  python node yarn pipx mas
+  terraform terragrunt awscli aws-cdk sops
+  azure-cli docker docker-completion
+  helm kubernetes-cli
+  postgresql@15 ripgrep
 )
 CASKS=(
-  iterm2 docker google-chrome 1password intellij-idea
+  iterm2 google-chrome firefox 1password
+  intellij-idea chatgpt claude zoom displaylink
+  font-meslo-lg-nerd-font
 )
 MAS_APPS=(
-  # "497799835 Xcode"
-  # "409183694 Keynote"
+  "424389933 Final Cut Pro"
 )
 
 for f in "${FORMULAS[@]}"; do
